@@ -2,10 +2,14 @@ spring:
   application:
     name: highload-async-service
   jpa:
+    hibernate:
+      ddl-auto: none
     show-sql: true
     properties:
       hibernate:
         format_sql: true
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yml
 
   datasource:
     url: jdbc:postgresql://localhost:5432/taskdb
@@ -29,14 +33,13 @@ spring:
 
       # Метрики и мониторинг
       register-mbeans: true
-      metrics-tracker-enabled: true
       pool-name: TaskServicePool
+
+  kafka:
+    bootstrap-servers: kafka:9092
 
 server:
   port: 8040
-
-kafka:
-  bootstrap-servers: 9092
 
 worker:
   pool:

@@ -1,5 +1,6 @@
 package dev.aziz.highloadasyncservice.controller;
 
+import dev.aziz.highloadasyncservice.dto.TaskRequestDTO;
 import dev.aziz.highloadasyncservice.dto.TaskResponseDTO;
 import dev.aziz.highloadasyncservice.exception.TaskNotFoundException;
 import dev.aziz.highloadasyncservice.service.TaskService;
@@ -9,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -25,4 +28,11 @@ public class TaskController {
     public ResponseEntity<TaskResponseDTO> getTask(@PathVariable Long id) {
         return ResponseEntity.ok(taskService.findById(id));
     }
+
+    @PostMapping
+    public ResponseEntity<?> saveTask(@RequestBody TaskRequestDTO taskRequestDTO) {
+        taskService.sendTask(taskRequestDTO);
+        return ResponseEntity.accepted().build();
+    }
+
 }

@@ -2,14 +2,12 @@ package dev.aziz.highloadasyncservice.repository;
 
 import dev.aziz.highloadasyncservice.model.Task;
 import dev.aziz.highloadasyncservice.model.TaskStatus;
-import jakarta.persistence.LockModeType;
-import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -34,4 +32,8 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     // Обычный метод для других случаев
     Optional<Task> findFirstByStatus(TaskStatus status);
+
+    List<Task> findTop20ByStatusAndStartedAtBeforeOrderByStartedAtAsc(TaskStatus status, Instant threshold);
+//    List<Task> findTop20ByStatusAndStartedAtBefore(TaskStatus status, Instant threshold);
+
 }

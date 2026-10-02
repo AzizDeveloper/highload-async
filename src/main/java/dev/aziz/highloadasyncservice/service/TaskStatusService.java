@@ -1,36 +1,42 @@
 package dev.aziz.highloadasyncservice.service;
 
+import dev.aziz.highloadasyncservice.exception.TaskNotFoundException;
 import dev.aziz.highloadasyncservice.model.Task;
 import dev.aziz.highloadasyncservice.model.TaskStatus;
+import dev.aziz.highloadasyncservice.repository.TaskRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class TaskStatusService {  
-    // Сервис для обновления статусов задач  
-    private final TaskUpdateService taskUpdateService;  
+public class TaskStatusService {
 
-    // Метод выполнения задачи
-    public void executeTask(Task task) {
-        try {  
-            // Имитация выполнения задачи  
-            Thread.sleep(task.getDuration());  
-            // Обновление статуса через отдельный сервис для корректной работы транзакций  
-            taskUpdateService.updateTaskStatus(  
-                task.getId(),   
-                TaskStatus.COMPLETED,
-                "Task completed successfully"  
-            );  
-        } catch (Exception e) {  
-            // При ошибке обновляем статус на FAILED  
-            taskUpdateService.updateTaskStatus(  
-                task.getId(),   
-                TaskStatus.FAILED,   
-                "Error: " + e.getMessage()  
-            );  
-        }  
-    }  
-}  
+    private final TaskRepository taskRepository;
+
+    // Метод обновления статуса задачи в отдельной транзакции
+    @Transactional
+    public void updateTaskStatus(Long taskId, TaskStatus status, String result) {
+        try {
+            // Получаем задачу из БД
+            Task task = taskRepository.findById(taskId)
+                    .orElseThrow(() -> new TaskNotFoundException(taskId));
+
+            // Логируем информацию об обновлении
+            log.debug("Updating task {} to status {}. Current version: {}",
+                    taskId, status, task.getVersion());
+
+            // Обновляем статус и результат
+            task.setStatus(status);
+            task.setResult(result);
+            taskRepository.save(task);
+        } catch (Exception e) {
+            // Логируем ошибку и пробрасываем исключение выше
+            log.error("Error updating task status: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+}

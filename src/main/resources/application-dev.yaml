@@ -1,0 +1,57 @@
+spring:
+  application:
+    name: highload-async-service
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yml
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/taskdb
+    username: user
+    password: password
+    hikari:
+      # Основные настройки пула
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000  # 5 минут
+      connection-timeout: 20000  # 20 секунд
+      max-lifetime: 1200000  # 20 минут
+
+      # Настройки производительности
+      auto-commit: false
+      validation-timeout: 5000
+      leak-detection-threshold: 60000
+
+      # Настройки для оптимистичной блокировки
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+
+      # Метрики и мониторинг
+      register-mbeans: true
+      pool-name: TaskServicePool
+
+  kafka:
+    bootstrap-servers: localhost:29092
+
+
+server:
+  port: 8040
+
+worker:
+  pool:
+    size: 36
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+
