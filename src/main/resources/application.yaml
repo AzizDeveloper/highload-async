@@ -39,7 +39,7 @@ spring:
     bootstrap-servers: kafka:9092
 
 server:
-  port: 8040
+  port: 8080
 
 worker:
   pool:
@@ -48,3 +48,9 @@ worker:
 logging:
   level:
     org.hibernate.SQL: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics

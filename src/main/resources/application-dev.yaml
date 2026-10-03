@@ -49,6 +49,7 @@ worker:
 logging:
   level:
     org.hibernate.SQL: DEBUG
+
 management:
   endpoints:
     web:

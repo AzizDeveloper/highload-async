@@ -22,6 +22,52 @@ services:
       - app-network     # Подключение к общей сети
     restart: unless-stopped  # Перезапуск при падении, кроме ручной остановки
 
+  app2:
+    build:
+      context: .          # Указываем текущую директорию как контекст сборки
+      dockerfile: Dockerfile  # Имя файла для сборки образа
+    container_name: task-processor-2  # Задаем имя контейнера
+    depends_on: # Определяем зависимости от других сервисов
+      - postgres         # Запускаться после PostgreSQL
+      - kafka           # Запускаться после Kafka
+    environment: # Переменные окружения для Spring Boot
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/taskdb  # URL подключения к БД
+      - SPRING_DATASOURCE_USERNAME=user        # Имя пользователя БД
+      - SPRING_DATASOURCE_PASSWORD=password    # Пароль для БД
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092  # Адрес брокера Kafka
+    ports:
+      - "8081:8080"     # Проброс порта приложения (хост:контейнер)
+    networks:
+      - app-network     # Подключение к общей сети
+    restart: unless-stopped  # Перезапуск при падении, кроме ручной остановки
+
+  app3:
+    build:
+      context: .          # Указываем текущую директорию как контекст сборки
+      dockerfile: Dockerfile  # Имя файла для сборки образа
+    container_name: task-processor-3  # Задаем имя контейнера
+    depends_on: # Определяем зависимости от других сервисов
+      - postgres         # Запускаться после PostgreSQL
+      - kafka           # Запускаться после Kafka
+    environment: # Переменные окружения для Spring Boot
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/taskdb  # URL подключения к БД
+      - SPRING_DATASOURCE_USERNAME=user        # Имя пользователя БД
+      - SPRING_DATASOURCE_PASSWORD=password    # Пароль для БД
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092  # Адрес брокера Kafka
+    ports:
+      - "8082:8080"     # Проброс порта приложения (хост:контейнер)
+    networks:
+      - app-network     # Подключение к общей сети
+    restart: unless-stopped  # Перезапуск при падении, кроме ручной остановки
+
+  k6:
+    image: grafana/k6:latest
+    container_name: k6
+    volumes:
+      - ./k6:/scripts
+    working_dir: /scripts
+    command: run /scripts/index.js
+
   # Конфигурация PostgreSQL
   postgres:
     image: postgres:17  # Используем легковесную версию PostgreSQL
@@ -69,8 +115,8 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1  # Фактор репликации лога транзакций
 
       # Идентификация кластера KRaft
-      KAFKA_CLUSTER_ID: 'KafkaKRaftCluster'  # ID кластера
-      CLUSTER_ID: 'KafkaKRaftCluster'        # Дублирующий ID для совместимости
+      KAFKA_CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw  # ID кластера
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw        # Дублирующий ID для совместимости
     ports:
       - "9092:9092"     # Проброс порта Kafka
     networks:
@@ -78,7 +124,7 @@ services:
     volumes:
       - kafka-data:/var/lib/kafka/data  # Том для хранения данных
     healthcheck:        # Проверка работоспособности
-      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server kafka:9092 --list"]
       interval: 30s     # Интервал проверки
       timeout: 10s      # Таймаут
       retries: 3        # Количество попыток
@@ -86,7 +132,7 @@ services:
   # Веб-интерфейс для управления Kafka
   kafka-ui:
     image: provectuslabs/kafka-ui:latest  # Последняя версия UI
-    container_name: kafka-ui  # Имя контейнера
+    container_name: kafka-ui-highload  # Имя контейнера
     depends_on:
       - kafka                # Зависимость от Kafka
     environment:

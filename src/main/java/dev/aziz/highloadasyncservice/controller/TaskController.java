@@ -2,7 +2,6 @@ package dev.aziz.highloadasyncservice.controller;
 
 import dev.aziz.highloadasyncservice.dto.TaskRequestDTO;
 import dev.aziz.highloadasyncservice.dto.TaskResponseDTO;
-import dev.aziz.highloadasyncservice.exception.TaskNotFoundException;
 import dev.aziz.highloadasyncservice.service.TaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

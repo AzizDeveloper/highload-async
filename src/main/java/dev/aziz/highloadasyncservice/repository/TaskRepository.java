@@ -30,10 +30,8 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
         """, nativeQuery = true)
     Optional<Task> findAndLockFirstNewTask();
 
-    // Обычный метод для других случаев
     Optional<Task> findFirstByStatus(TaskStatus status);
 
     List<Task> findTop20ByStatusAndStartedAtBeforeOrderByStartedAtAsc(TaskStatus status, Instant threshold);
-//    List<Task> findTop20ByStatusAndStartedAtBefore(TaskStatus status, Instant threshold);
 
 }

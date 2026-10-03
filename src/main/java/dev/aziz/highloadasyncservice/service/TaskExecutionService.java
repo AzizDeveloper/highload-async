@@ -3,6 +3,7 @@ package dev.aziz.highloadasyncservice.service;
 import dev.aziz.highloadasyncservice.exception.TaskNotFoundException;
 import dev.aziz.highloadasyncservice.model.Task;
 import dev.aziz.highloadasyncservice.model.TaskStatus;
+import dev.aziz.highloadasyncservice.observability.metrics.TaskMetrics;
 import dev.aziz.highloadasyncservice.repository.TaskRepository;
 import jakarta.annotation.PreDestroy;
 import jakarta.persistence.OptimisticLockException;
@@ -34,6 +35,7 @@ public class TaskExecutionService {
     private final PlatformTransactionManager transactionManager;
     // Сервис для обновления статусов задач
     private final TaskStatusService taskStatusService;
+    private final TaskMetrics taskMetrics;
 
     @Retryable(
             value = ObjectOptimisticLockingFailureException.class,
@@ -128,7 +130,12 @@ public class TaskExecutionService {
                 task.getStatus() != TaskStatus.FAILED) {
             return;
         }
-
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            log.error("Thread.sleep failed. TaskExecutionService - {}", e.getMessage(), e);
+            throw new RuntimeException(e);
+        }
         if (task.getRetryCount() >= 3) {
             if (task.getStatus() == TaskStatus.IN_PROGRESS) {
                 task.setStatus(TaskStatus.FAILED);
@@ -145,7 +152,8 @@ public class TaskExecutionService {
         try {
             taskRepository.save(task);
         } catch (ObjectOptimisticLockingFailureException e) {
-            log.debug("Task {} was already updated by another thread/worker. Skipping.", taskId);
+            taskMetrics.recordConflict();
+            log.warn("Task {} was already updated by another thread/worker. Skipping.", taskId);
         }
     }
 
