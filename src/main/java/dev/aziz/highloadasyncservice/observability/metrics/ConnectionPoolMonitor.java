@@ -2,33 +2,34 @@ package dev.aziz.highloadasyncservice.observability.metrics;
 
 import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.HikariPoolMXBean;
-import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import javax.sql.DataSource;
+
 @Component
 @Slf4j
 @RequiredArgsConstructor
 public class ConnectionPoolMonitor {
-    private final HikariDataSource dataSource;
-    private final MeterRegistry meterRegistry;
+    private final DataSource dataSource;
 
-    @Scheduled(fixedRate = 60000) // каждую минуту
+    @Scheduled(fixedDelay = 60000)
     public void monitorConnectionPool() {
-        HikariPoolMXBean poolMXBean = dataSource.getHikariPoolMXBean();
+        if (!(dataSource instanceof HikariDataSource hikari)) {
+            return;
+        }
 
-        log.info("Connection pool status: active={}, idle={}, total={}",
-            poolMXBean.getActiveConnections(),
-            poolMXBean.getIdleConnections(),
-            poolMXBean.getTotalConnections()
-        );
+        HikariPoolMXBean pool = hikari.getHikariPoolMXBean();
+        if (pool == null) {
+            return;
+        }
 
-        // Регистрируем метрики
-        meterRegistry.gauge("hikari.pool.active.connections",
-            poolMXBean.getActiveConnections());
-        meterRegistry.gauge("hikari.pool.idle.connections",
-            poolMXBean.getIdleConnections());
+        log.info("Connection pool: active={}, idle={}, total={}, waiting={}",
+                pool.getActiveConnections(),
+                pool.getIdleConnections(),
+                pool.getTotalConnections(),
+                pool.getThreadsAwaitingConnection());
     }
 }

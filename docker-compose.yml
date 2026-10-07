@@ -1,154 +1,110 @@
-# Указываем версию спецификации Docker Compose
-version: '3.8'
-
 services:
-  # Конфигурация основного приложения
   app:
     build:
-      context: .          # Указываем текущую директорию как контекст сборки
-      dockerfile: Dockerfile  # Имя файла для сборки образа
-    container_name: task-processor  # Задаем имя контейнера
-    depends_on:           # Определяем зависимости от других сервисов
-      - postgres         # Запускаться после PostgreSQL
-      - kafka           # Запускаться после Kafka
-    environment:         # Переменные окружения для Spring Boot
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/taskdb  # URL подключения к БД
-      - SPRING_DATASOURCE_USERNAME=user        # Имя пользователя БД
-      - SPRING_DATASOURCE_PASSWORD=password    # Пароль для БД
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092  # Адрес брокера Kafka
-    ports:
-      - "8080:8080"     # Проброс порта приложения (хост:контейнер)
-    networks:
-      - app-network     # Подключение к общей сети
-    restart: unless-stopped  # Перезапуск при падении, кроме ручной остановки
-
-  app2:
-    build:
-      context: .          # Указываем текущую директорию как контекст сборки
-      dockerfile: Dockerfile  # Имя файла для сборки образа
-    container_name: task-processor-2  # Задаем имя контейнера
-    depends_on: # Определяем зависимости от других сервисов
-      - postgres         # Запускаться после PostgreSQL
-      - kafka           # Запускаться после Kafka
-    environment: # Переменные окружения для Spring Boot
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/taskdb  # URL подключения к БД
-      - SPRING_DATASOURCE_USERNAME=user        # Имя пользователя БД
-      - SPRING_DATASOURCE_PASSWORD=password    # Пароль для БД
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092  # Адрес брокера Kafka
-    ports:
-      - "8081:8080"     # Проброс порта приложения (хост:контейнер)
-    networks:
-      - app-network     # Подключение к общей сети
-    restart: unless-stopped  # Перезапуск при падении, кроме ручной остановки
-
-  app3:
-    build:
-      context: .          # Указываем текущую директорию как контекст сборки
-      dockerfile: Dockerfile  # Имя файла для сборки образа
-    container_name: task-processor-3  # Задаем имя контейнера
-    depends_on: # Определяем зависимости от других сервисов
-      - postgres         # Запускаться после PostgreSQL
-      - kafka           # Запускаться после Kafka
-    environment: # Переменные окружения для Spring Boot
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/taskdb  # URL подключения к БД
-      - SPRING_DATASOURCE_USERNAME=user        # Имя пользователя БД
-      - SPRING_DATASOURCE_PASSWORD=password    # Пароль для БД
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092  # Адрес брокера Kafka
-    ports:
-      - "8082:8080"     # Проброс порта приложения (хост:контейнер)
-    networks:
-      - app-network     # Подключение к общей сети
-    restart: unless-stopped  # Перезапуск при падении, кроме ручной остановки
-
-  k6:
-    image: grafana/k6:latest
-    container_name: k6
-    volumes:
-      - ./k6:/scripts
-    working_dir: /scripts
-    command: run /scripts/index.js
-
-  # Конфигурация PostgreSQL
-  postgres:
-    image: postgres:17  # Используем легковесную версию PostgreSQL
-    container_name: postgres-db  # Имя контейнера
-    environment:              # Переменные окружения для PostgreSQL
-      - POSTGRES_DB=taskdb   # Имя базы данных
-      - POSTGRES_USER=user   # Пользователь
-      - POSTGRES_PASSWORD=password  # Пароль
-    volumes:
-      - postgres-data:/var/lib/postgresql/data  # Том для хранения данных
-    ports:
-      - "5432:5432"         # Проброс порта PostgreSQL
-    networks:
-      - app-network         # Подключение к общей сети
-    healthcheck:           # Проверка работоспособности
-      test: ["CMD-SHELL", "pg_isready -U user -d taskdb"]  # Команда проверки
-      interval: 10s        # Интервал проверки
-      timeout: 5s         # Таймаут
-      retries: 5         # Количество попыток
-
-  # Конфигурация Kafka с использованием KRaft
-  kafka:
-    image: confluentinc/cp-kafka:7.5.16  # Последняя стабильная версия
-    container_name: kafka   # Имя контейнера
-    environment:
-      # Основные настройки Kafka
-      KAFKA_BROKER_ID: 1    # Уникальный идентификатор брокера
-
-      # Настройки KRaft (замена ZooKeeper)
-      KAFKA_NODE_ID: 1      # Идентификатор узла в KRaft
-      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'  # Конфигурация голосующих узлов
-      KAFKA_PROCESS_ROLES: 'broker,controller'  # Роли процесса (брокер и контроллер)
-      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'  # Имя слушателя для контроллера
-
-      # Настройки сетевых подключений
-      KAFKA_LISTENERS: 'PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093'  # Точки подключения
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092'  # Внешний адрес брокера
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'  # Протоколы
-      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'  # Слушатель для взаимодействия брокеров
-
-      # Настройки репликации и транзакций
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1  # Фактор репликации для топика смещений
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0  # Задержка начального ребаланса
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1     # Минимальное число реплик для транзакций
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1  # Фактор репликации лога транзакций
-
-      # Идентификация кластера KRaft
-      KAFKA_CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw  # ID кластера
-      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw        # Дублирующий ID для совместимости
-    ports:
-      - "9092:9092"     # Проброс порта Kafka
-    networks:
-      - app-network     # Подключение к общей сети
-    volumes:
-      - kafka-data:/var/lib/kafka/data  # Том для хранения данных
-    healthcheck:        # Проверка работоспособности
-      test: ["CMD-SHELL", "kafka-topics --bootstrap-server kafka:9092 --list"]
-      interval: 30s     # Интервал проверки
-      timeout: 10s      # Таймаут
-      retries: 3        # Количество попыток
-
-  # Веб-интерфейс для управления Kafka
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest  # Последняя версия UI
-    container_name: kafka-ui-highload  # Имя контейнера
+      context: .
+      dockerfile: Dockerfile
     depends_on:
-      - kafka                # Зависимость от Kafka
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     environment:
-      KAFKA_CLUSTERS_0_NAME: local  # Имя кластера в UI
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092  # Адрес подключения
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/taskdb
+      SPRING_DATASOURCE_USERNAME: user
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:-password}"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      WORKER_POOL_SIZE: "4"
+      KAFKA_TOPIC: tasks
     ports:
-      - "8090:8080"         # Проброс порта UI
+      - "8080"
     networks:
-      - app-network         # Подключение к общей сети
+      - app-network
+    restart: unless-stopped
+    stop_grace_period: 75s
 
-# Определение томов для постоянного хранения
+  postgres:
+    image: postgres:17.0
+    environment:
+      POSTGRES_DB: taskdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-password}"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d taskdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.16
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: "INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka:29092,EXTERNAL://localhost:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: "${KRAFT_CLUSTER_ID:-MkU3OEVBNTcwNTJENDM2Qk}"
+    ports:
+      - "127.0.0.1:9092:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:29092 --list"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.16
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - |
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic tasks --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic tasks.DLT --partitions 3 --replication-factor 1
+    networks:
+      - app-network
+    restart: "no"
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    ports:
+      - "127.0.0.1:8090:8080"
+    networks:
+      - app-network
+
 volumes:
-  postgres-data:    # Том для PostgreSQL
-  kafka-data:       # Том для Kafka
+  postgres-data:
+  kafka-data:
 
-# Определение сети для коммуникации сервисов
 networks:
-  app-network:      # Общая сеть для всех сервисов
-    driver: bridge  # Использование bridge-драйвера
+  app-network:
+    driver: bridge

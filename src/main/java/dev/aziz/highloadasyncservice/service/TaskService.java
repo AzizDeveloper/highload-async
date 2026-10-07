@@ -1,119 +1,72 @@
 package dev.aziz.highloadasyncservice.service;
 
-import dev.aziz.highloadasyncservice.dto.ProcessTaskCommand;
-import dev.aziz.highloadasyncservice.dto.TaskRequestDTO;
-import dev.aziz.highloadasyncservice.dto.TaskResponseDTO;
-import dev.aziz.highloadasyncservice.exception.TaskNotFoundException;
-import dev.aziz.highloadasyncservice.model.Task;
-import dev.aziz.highloadasyncservice.model.TaskStatus;
-import dev.aziz.highloadasyncservice.repository.TaskRepository;
+import dev.aziz.highloadasyncservice.dto.TaskRun;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.UUID;
+import java.util.Optional;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class TaskService {
-
+    private final ThreadPoolExecutor taskExecutor;
     private final TaskExecutionService taskExecutionService;
-    private final TaskRepository taskRepository;
-    private final KafkaTemplate<String, ProcessTaskCommand> kafkaTemplate;
+    private final TaskStatusService taskStatusService;
+    private volatile boolean stopping;
 
-    @Scheduled(fixedDelay = 1000)
+    @Scheduled(fixedDelayString = "${worker.poll-delay-ms:1000}")
     public void processTask() {
-        log.info("Starting task processing...");
-        taskRepository.findFirstByStatus(TaskStatus.NEW)
-                .ifPresent(taskExecutionService::processTaskWithRetry);
-    }
-
-    @Scheduled(fixedDelay = 60000)
-    public void processFailedTasks() {
-        log.info("Starting failed task processing...");
-        taskRepository.findFirstByStatus(TaskStatus.FAILED)
-                .ifPresent(task -> {
-                    if (task.getRetryCount() < 3) {
-                        try {
-                            taskExecutionService.resetTask(task.getId());
-                        } catch (Exception e) {
-                            log.error("Failed to process the failed task {}", task.getId(), e);
-                        }
-                    } else {
-                        log.info("Task {} has been sent to Dead Letter Queue", task.getId());
-                        log.info("Task {} has been sent to admin.", task.getId());
-                        log.info("Retrying failed task {}", task.getId());
-                    }
-                });
-    }
-
-    @Scheduled(fixedDelay = 60000)
-    public void processStuckTasks() {
-        log.info("Starting stuck tasks processing...");
-        Instant threshold = Instant.now().minus(15, ChronoUnit.MINUTES);
-
-        List<Task> stuckTasks = taskRepository.findTop20ByStatusAndStartedAtBeforeOrderByStartedAtAsc(
-                TaskStatus.IN_PROGRESS, threshold
-        );
-
-        if (stuckTasks.isEmpty()) {
+        if (stopping || taskExecutor.isShutdown()) {
             return;
         }
 
-        log.info("Found {} stuck tasks to evaluate.", stuckTasks.size());
-
-        for (Task task : stuckTasks) {
+        for (int i = 0; i < taskExecutor.getMaximumPoolSize(); i++) {
             try {
-                taskExecutionService.resetTask(task.getId());
-            } catch (Exception e) {
-                log.error("Failed to process stuck task {}", task.getId(), e);
+                // Сначала получаем место в пуле, потом воркер идет в БД
+                taskExecutor.execute(this::runWorker);
+            } catch (RejectedExecutionException e) {
+                // Свободных потоков нет или уже началось завершение
+                break;
             }
         }
     }
 
-    public void sendTask(TaskRequestDTO taskRequestDTO) {
-        ProcessTaskCommand processTaskCommand = new ProcessTaskCommand(
-                taskRequestDTO.getName(),
-                taskRequestDTO.getDuration(),
-                UUID.randomUUID()
-        );
-        kafkaTemplate.send("task-topic", processTaskCommand);
+    private void runWorker() {
+        try {
+            while (!stopping && !Thread.currentThread().isInterrupted()) {
+                Optional<TaskRun> run = taskExecutionService.claimNextTask();
+                if (run.isEmpty()) {
+                    return;
+                }
+                taskStatusService.executeTask(run.get());
+            }
+        } catch (RuntimeException e) {
+            log.error("Ошибка рабочего цикла", e);
+        }
     }
 
-    @KafkaListener(
-            topics = "task-topic",
-            groupId = "task-group"
-    )
-    public void consume(ProcessTaskCommand processTaskCommand) {
-        Task task = new Task();
-        task.setStatus(TaskStatus.NEW);
-        task.setDuration(processTaskCommand.duration());
-        task.setName(processTaskCommand.name());
-        task.setIdempotencyKey(processTaskCommand.idempotencyKey());
-        taskRepository.save(task);
-    }
-
-    public TaskResponseDTO findById(Long id) {
-        Task task = taskRepository.findById(id)
-                .orElseThrow(() -> new TaskNotFoundException(id));
-        return toDTO(task);
-    }
-
-    private TaskResponseDTO toDTO(Task task) {
-        return TaskResponseDTO.builder()
-                .id(task.getId())
-                .name(task.getName())
-                .duration(task.getDuration())
-                .status(task.getStatus())
-                .result(task.getResult())
-                .build();
+    @PreDestroy
+    public void shutdown() {
+        stopping = true;
+        taskExecutor.shutdown();
+        try {
+            if (!taskExecutor.awaitTermination(60, TimeUnit.SECONDS)) {
+                taskExecutor.shutdownNow();
+                if (!taskExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    log.warn("Не все воркеры завершились после прерывания");
+                }
+            }
+        } catch (InterruptedException e) {
+            taskExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
 }

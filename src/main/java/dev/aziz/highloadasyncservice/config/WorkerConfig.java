@@ -4,18 +4,29 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 @Configuration
 public class WorkerConfig {
 
-    @Value("${worker.pool.size}")
-    private int poolSize;
+    @Bean(destroyMethod = "")
+    public ThreadPoolExecutor taskExecutor(
+            @Value("${worker.pool.size:4}") int poolSize
+    ) {
+        if (poolSize < 1) {
+            throw new IllegalArgumentException("worker.pool.size должен быть положительным");
+        }
 
-    @Bean
-    public ExecutorService taskExecutor() {
-        return Executors.newFixedThreadPool(poolSize);
+        return new ThreadPoolExecutor(
+                poolSize,
+                poolSize,
+                0L,
+                TimeUnit.MILLISECONDS,
+                new SynchronousQueue<>(),
+                new ThreadPoolExecutor.AbortPolicy()
+        );
     }
 
 }
