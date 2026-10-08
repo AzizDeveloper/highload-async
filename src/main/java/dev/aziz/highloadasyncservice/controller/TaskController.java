@@ -23,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/tasks")
 @RequiredArgsConstructor
@@ -55,6 +57,31 @@ public class TaskController {
             @PathVariable("id") @Positive Long id
     ) {
         return ResponseEntity.ok(taskQueryService.findById(id));
+    }
+
+    @GetMapping("/{eventId}/events")
+    @Operation(summary = "Получить статус и результат задачи")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Задача найдена",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = TaskResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Некорректный идентификатор",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Задача не найдена",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "503", description = "База данных недоступна",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервиса",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<TaskResponseDTO> getTaskByEventId(
+            @PathVariable("eventId") UUID eventId
+    ) {
+        return ResponseEntity.ok(taskQueryService.findByEventId(eventId));
     }
 
     @PostMapping

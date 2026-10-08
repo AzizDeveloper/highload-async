@@ -20,7 +20,7 @@ public class TaskClaimService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<TaskRun> claimNextTask() {
-        return taskRepository.findFirstByStatusOrderByIdAsc(TaskStatus.NEW)
+        return taskRepository.findAndLockFirstNewTask()
                 .map(task -> {
                     task.setStatus(TaskStatus.IN_PROGRESS);
                     task.setExecutionId(UUID.randomUUID());

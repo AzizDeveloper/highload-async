@@ -17,6 +17,15 @@ import java.util.UUID;
 @Repository
 public interface TaskRepository extends JpaRepository<Task, Long> {
 
+    @Query(value = """
+    SELECT * FROM tasks
+    WHERE status = 'NEW'
+    ORDER BY id
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED
+    """, nativeQuery = true)
+    Optional<Task> findAndLockFirstNewTask();
+
     Optional<Task> findFirstByStatusOrderByIdAsc(TaskStatus status);
 
     Optional<Task> findByEventId(UUID eventId);
