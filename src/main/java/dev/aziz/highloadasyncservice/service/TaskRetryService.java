@@ -30,6 +30,9 @@ public class TaskRetryService {
         task.setFinishedAt(null);
         task.setProgress(0);
         task.setResult(null);
+        task.setAttempts(0);
+        task.setLeaseUntil(null);
+        task.setNextRetryAt(null);
         return true;
     }
 

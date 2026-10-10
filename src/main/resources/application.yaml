@@ -34,6 +34,10 @@ worker:
     size: 4
   poll-delay-ms: 1000
 
+lease:
+  timeout:
+    seconds: 30
+
 kafka:
   topic: tasks
   listener:

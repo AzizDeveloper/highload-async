@@ -62,4 +62,16 @@ public class Task {
     @Column(nullable = false)
     private Long version;
 
+    @Column(nullable = false)
+    private Integer attempts = 0;
+
+    @Column(name = "max_attempts", nullable = false)
+    private Integer maxAttempts = 3;
+
+    @Column(name = "lease_until")
+    private Instant leaseUntil;
+
+    @Column(name = "next_retry_at")
+    private Instant nextRetryAt;
+
 }

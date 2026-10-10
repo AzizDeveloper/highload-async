@@ -6,6 +6,7 @@ import dev.aziz.highloadasyncservice.dto.TaskRequestDTO;
 import dev.aziz.highloadasyncservice.dto.TaskResponseDTO;
 import dev.aziz.highloadasyncservice.service.TaskPublisher;
 import dev.aziz.highloadasyncservice.service.TaskQueryService;
+import dev.aziz.highloadasyncservice.service.TaskRetryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -33,6 +34,7 @@ import java.util.UUID;
 public class TaskController {
     private final TaskQueryService taskQueryService;
     private final TaskPublisher taskPublisher;
+    private final TaskRetryService taskRetryService;
 
     @GetMapping("/{id}")
     @Operation(summary = "Получить статус и результат задачи")
@@ -88,6 +90,11 @@ public class TaskController {
     public ResponseEntity<?> saveTask(@RequestBody TaskRequestDTO taskRequestDTO) {
         String eventId = taskPublisher.publish(taskRequestDTO);
         return ResponseEntity.accepted().body(new TaskAcceptedResponse(eventId));
+    }
+
+    @PostMapping("/admin/retry/{id}")
+    public ResponseEntity<?> retryTask(@PathVariable Long id) {
+        return ResponseEntity.ok(taskRetryService.retryFailedTask(id));
     }
 
 }

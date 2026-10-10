@@ -18,13 +18,86 @@ import java.util.UUID;
 public interface TaskRepository extends JpaRepository<Task, Long> {
 
     @Query(value = """
-    SELECT * FROM tasks
-    WHERE status = 'NEW'
-    ORDER BY id
-    LIMIT 1
-    FOR UPDATE SKIP LOCKED
-    """, nativeQuery = true)
+            SELECT *
+            FROM tasks
+            WHERE status = 'NEW'
+              AND (next_retry_at IS NULL OR next_retry_at <= CURRENT_TIMESTAMP)
+              AND attempts < max_attempts
+            ORDER BY id
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED;
+            """, nativeQuery = true)
     Optional<Task> findAndLockFirstNewTask();
+
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+            WITH expired AS (
+                SELECT id
+                FROM tasks
+                WHERE status = 'IN_PROGRESS'
+                  AND lease_until < CURRENT_TIMESTAMP
+                ORDER BY lease_until, id
+                LIMIT 100
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE tasks t
+            SET status = CASE
+                    WHEN t.attempts < t.max_attempts THEN 'NEW'
+                    ELSE 'FAILED'
+                END,
+                execution_id = NULL,
+                lease_until = NULL,
+                next_retry_at = CASE
+                    WHEN t.attempts < t.max_attempts
+                        THEN CURRENT_TIMESTAMP + INTERVAL '30 seconds'
+                    ELSE NULL
+                END,
+                started_at = CASE
+                    WHEN t.attempts < t.max_attempts THEN NULL
+                    ELSE t.started_at
+                END,
+                finished_at = CASE
+                    WHEN t.attempts >= t.max_attempts THEN CURRENT_TIMESTAMP
+                    ELSE NULL
+                END,
+                progress = CASE
+                    WHEN t.attempts < t.max_attempts THEN 0
+                    ELSE t.progress
+                END,
+                result = 'Истекло время владения задачей',
+                version = t.version + 1
+            FROM expired e
+            WHERE t.id = e.id
+            """, nativeQuery = true)
+    int recoverStuckTasks();
+
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+            WITH retryable AS (
+                SELECT id
+                FROM tasks
+                WHERE status = 'FAILED'
+                  AND next_retry_at IS NOT NULL
+                  AND next_retry_at <= CURRENT_TIMESTAMP
+                  AND attempts < max_attempts
+                ORDER BY next_retry_at, id
+                LIMIT 100
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE tasks t
+            SET status = 'NEW',
+                execution_id = NULL,
+                lease_until = NULL,
+                next_retry_at = NULL,
+                started_at = NULL,
+                finished_at = NULL,
+                progress = 0,
+                result = NULL,
+                version = t.version + 1
+            FROM retryable r
+            WHERE t.id = r.id
+            """, nativeQuery = true)
+    int retryEligibleFailedTasks();
 
     Optional<Task> findFirstByStatusOrderByIdAsc(TaskStatus status);
 
