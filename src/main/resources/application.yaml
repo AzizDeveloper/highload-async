@@ -54,7 +54,3 @@ management:
   endpoint:
     health:
       show-details: never
-
-logging:
-  level:
-    org.hibernate.SQL: DEBUG

@@ -17,7 +17,6 @@ public class StuckTaskRetryScheduler {
     @Scheduled(fixedDelayString = "${task.retry.check-delay-ms:60000}")
     @Transactional
     public void retryStuckTasks() {
-        // TODO: stuck task processing logic.  All magic SQLs and etc.
         try {
             int recoveredCount = taskRepository.recoverStuckTasks();
             if (recoveredCount > 0) {

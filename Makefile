@@ -62,8 +62,11 @@ docker-build:
 docker-up:
 	docker compose up -d
 
+docker-up-3-apps:
+	docker compose up -d --scale app=3
+
 docker-load-test-up:
-	 docker compose --profile load-test up -d
+	docker compose --profile load-test up -d
 
 docker-down:
 	docker compose down
